@@ -13,7 +13,7 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f7f9fb;
-            position: relative; /* Wichtig für absolute positionierte Kinder-Elemente */
+            position: relative; 
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -28,12 +28,10 @@
         /* Overlay für helleren Hintergrund mit Transparenz */
         body::before {
             content: "";
-            position: absolute; /* Muss absolute sein, um im iFrame zu funktionieren */
+            position: absolute; 
             top: 0;
             left: 0;
             width: 100%;
-            /* min-height 100vh sorgt dafür, dass es den gesamten sichtbaren Bereich abdeckt,
-               wenn der Inhalt nicht scrollt, wird height 100% benötigt */
             height: 100%; 
             min-height: 100vh;
             background-color: rgba(255, 255, 255, 0.4); /* Weiß-Overlay für mehr Lesbarkeit (40% Transparenz) */
@@ -57,6 +55,40 @@
         /* Alle Texte innerhalb der weißen Box sind wieder dunkel, um auf weißem Grund lesbar zu sein */
         .container-card h2, .container-card p, .container-card label {
             color: #1f2937;
+        }
+
+        /* Styling für das Kalender-Modal (Pop-up) */
+        .modal {
+            display: none; /* Standardmäßig versteckt */
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto; /* 15% von oben und zentriert */
+            padding: 20px;
+            border-radius: 1rem;
+            max-width: 90%;
+            width: 400px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
         }
     </style>
     <script>
@@ -96,10 +128,26 @@
     </div>
 </div>
 
+<!-- Interaktives Kalender Modal (Pop-up) -->
+<div id="calendar-popover" class="modal">
+    <div class="modal-content">
+        <span class="close-button">&times;</span>
+        <h3 class="text-xl font-bold mb-4 text-gray-800 flex items-center">
+            <i data-lucide="calendar-check" class="w-5 h-5 mr-2 text-google-blue"></i> Termin speichern
+        </h3>
+        <p class="mb-4 text-gray-600">Wähle, wo Du **<span id="event-date-display"></span> um <span id="event-time-display"></span>** speichern möchtest:</p>
+        <div class="space-y-3" id="calendar-options">
+            <!-- Dynamische Links hier eingefügt -->
+        </div>
+    </div>
+</div>
+
 <script type="module">
     // *** KEINE FIREBASE MEHR BENÖTIGT ***
 
     const quizContainer = document.getElementById('quiz-container');
+    const modal = document.getElementById('calendar-popover');
+    const closeModal = document.querySelector('.close-button');
 
     // Zustände für das Quiz
     let currentScreen = 'start'; // 'start', 'quiz', 'results'
@@ -110,13 +158,51 @@
     let quizSubmitted = false;
     
     // Platzhalter für App ID und User ID für die Sheets-Übertragung
-    const userId = crypto.randomUUID(); // Eindeutige ID für jeden Durchlauf
+    const userId = crypto.randomUUID(); 
     const appId = 'standalone-quiz-app';
 
     // HIER IST DIE URL FÜR DAS GOOGLE APPS SCRIPT
     const GOOGLE_SHEETS_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsg_ySSpTeWIjxQnjnbrvx-dKTe1OmvIkgZDqo5gN3XNiDUSiGYNwzT2pkUb6GCkqeNA/exec"; 
 
-    // Fragen wie in der letzten funktionierenden Version (ohne Gemini-Features)
+    // --- KALENDER DATEN AUS CSV (Termine Fold Training) ---
+    const CALENDAR_EVENTS = [
+        { date: "09.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "09.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "10.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "10.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "13.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "13.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "14.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "14.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "15.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "15.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "16.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "16.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "17.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "17.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "20.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "20.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "21.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "21.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "22.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "22.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "23.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "23.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "24.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "24.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "27.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "27.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "28.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "28.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "29.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "29.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "30.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "30.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "31.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
+        { date: "31.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" }
+    ];
+    // --- ENDE KALENDER DATEN ---
+
     const QUESTIONS = [
         {
             id: 1,
@@ -269,6 +355,108 @@
             emoji: "⏳"
         }
     ];
+
+    /**
+     * Helper: Formatiert Datum und Zeit in das ISO-ähnliche UTC-Format (YYYYMMDDTHHMMSSZ) für Kalender.
+     * Nimmt dd.mm.yyyy und hh:mm an.
+     * Da Zeitzoneninformationen fehlen, wird vereinfacht UTC angenommen.
+     */
+    function formatDateForCalendar(dateStr, timeStr) {
+        // dd.mm.yyyy -> [dd, mm, yyyy]
+        const [day, month, year] = dateStr.split('.').map(s => s.padStart(2, '0'));
+        // hh:mm -> hhmm
+        const time = timeStr.replace(':', ''); 
+        return `${year}${month}${day}T${time}00Z`; // Fügt Sekunden und Z (Zulu/UTC) hinzu
+    }
+
+    /**
+     * Helper: Generiert den Google Kalender Link.
+     */
+    function generateGCalLink(event) {
+        const title = encodeURIComponent("Pixel Fold & Watch Training");
+        const startDate = formatDateForCalendar(event.date, event.time);
+        // Endezeit ist eine Stunde später
+        const [hour, minute] = event.time.split(':').map(Number);
+        const endDate = formatDateForCalendar(event.date, `${(hour + 1).toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+        const details = encodeURIComponent("Webinar zu den neuen Features des Google Pixel 10 Pro Fold und der Pixel Watch 4.\nMeeting Link: https://" + event.link);
+        const location = encodeURIComponent("Online Meeting: https://" + event.link);
+
+        return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${details}&location=${location}&sf=true&output=xml`;
+    }
+
+    /**
+     * Helper: Erzeugt und lädt eine .ics Datei herunter.
+     */
+    function downloadIcs(event) {
+        const title = "Pixel Fold & Watch Training";
+        const startDate = formatDateForCalendar(event.date, event.time);
+        const [hour, minute] = event.time.split(':').map(Number);
+        const endDate = formatDateForCalendar(event.date, `${(hour + 1).toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+        const description = "Webinar zu den neuen Features des Google Pixel 10 Pro Fold und der Pixel Watch 4. Meeting Link: https://" + event.link;
+        const location = "Online Meeting: https://" + event.link;
+
+        const icsContent = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Google Inc//Google Calendar 70.6265//EN',
+            'CALSCALE:GREGORIAN',
+            'BEGIN:VEVENT',
+            'DTSTART:' + startDate,
+            'DTEND:' + endDate,
+            'SUMMARY:' + title,
+            'DESCRIPTION:' + description,
+            'LOCATION:' + location,
+            'UID:' + crypto.randomUUID(), // Eindeutige ID
+            'END:VEVENT',
+            'END:VCALENDAR'
+        ].join('\n');
+
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Training_${event.date.replace(/\./g, '')}_${event.time.replace(':', '')}.ics`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    // --- MODAL UND KALENDER LOGIK ---
+    closeModal.onclick = () => {
+        modal.style.display = "none";
+    }
+
+    window.onclick = (event) => {
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+    }
+
+    function openCalendarModal(event) {
+        document.getElementById('event-date-display').textContent = event.date;
+        document.getElementById('event-time-display').textContent = event.time + " Uhr";
+
+        const optionsContainer = document.getElementById('calendar-options');
+        optionsContainer.innerHTML = `
+            <a href="${generateGCalLink(event)}" target="_blank" class="flex items-center justify-center p-3 font-semibold rounded-lg bg-google-blue text-white hover:bg-opacity-90 transition duration-150">
+                <i data-lucide="calendar-plus" class="w-5 h-5 mr-2"></i> Zu Google Kalender hinzufügen
+            </a>
+            <button id="ics-download-btn" class="w-full flex items-center justify-center p-3 font-semibold rounded-lg bg-gray-700 text-white hover:bg-gray-600 transition duration-150">
+                <i data-lucide="download" class="w-5 h-5 mr-2"></i> .ics (Outlook, Apple) herunterladen
+            </button>
+            <p class="text-xs text-gray-500 pt-2">Meeting Link: <a href="https://${event.link}" target="_blank" class="text-google-blue underline">${event.link}</a></p>
+        `;
+        
+        document.getElementById('ics-download-btn').onclick = () => {
+            downloadIcs(event);
+            modal.style.display = "none";
+        };
+
+        modal.style.display = "block";
+        lucide.createIcons();
+    }
+    // --- ENDE MODAL UND KALENDER LOGIK ---
+
 
     /**
      * Speichert die Ergebnisse ausschließlich an Google Sheets.
@@ -474,18 +662,42 @@
      * Rendert den Ergebnisbildschirm.
      */
     function renderResultsScreen() {
+        let calendarHtml = CALENDAR_EVENTS.map(event => {
+            return `
+                <button data-date="${event.date}" data-time="${event.time}" 
+                        class="w-full text-left p-3 mb-2 border border-google-blue/30 bg-white rounded-lg hover:bg-google-blue/10 transition duration-150 flex justify-between items-center calendar-button"
+                        onclick="openCalendarModal({date: '${event.date}', time: '${event.time}', link: '${event.link}'})">
+                    <span class="font-semibold text-gray-800">${event.date}</span>
+                    <span class="font-mono text-google-blue flex items-center">
+                        <i data-lucide="clock" class="w-4 h-4 mr-1"></i> ${event.time} Uhr
+                    </span>
+                </button>
+            `;
+        }).join('');
+
         quizContainer.innerHTML = `
             <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center">
                 Quiz beendet! <i data-lucide="bar-chart-2" class="w-5 h-5 ml-2 text-google-green"></i>
             </h2>
-            <div class="bg-google-green text-white p-4 rounded-xl mb-6">
+            <div class="bg-google-green text-white p-4 rounded-xl mb-6 text-center font-bold text-lg">
                 Dein Ergebnis: **${score} von ${QUESTIONS.length}** korrekt!
             </div>
             
-            <p class="text-sm text-gray-700 mb-4 font-semibold">
+            <p class="text-sm text-gray-700 mb-6 font-semibold flex items-center justify-center">
                <i data-lucide="check-check" class="w-4 h-4 inline-block mr-1 text-google-blue"></i> 
                Deine Daten wurden erfolgreich an die Google Tabelle gesendet.
             </p>
+
+            <!-- NEUES FELD: Kalendertermine -->
+            <div class="mt-8 pt-4 border-t border-pixel-gray">
+                <h3 class="text-xl font-bold mb-4 text-google-blue flex items-center">
+                    <i data-lucide="calendar" class="w-5 h-5 mr-2"></i> Termine buchen (Fold Training)
+                </h3>
+                <p class="mb-4 text-gray-600 text-sm">Wähle Deinen Wunschtermin für das vertiefende Training und speichere ihn direkt in Deinem Kalender.</p>
+                <div class="max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                    ${calendarHtml}
+                </div>
+            </div>
 
             <button id="restart-button" class="w-full mt-8 bg-google-red text-white p-3 rounded-lg font-semibold hover:bg-opacity-90 transition duration-150 flex items-center justify-center">
                 <i data-lucide="rotate-ccw" class="w-5 h-5 mr-2"></i> Neues Quiz starten
@@ -525,3 +737,4 @@
 </script>
 </body>
 </html>
+
