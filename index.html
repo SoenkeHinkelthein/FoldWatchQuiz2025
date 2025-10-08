@@ -188,8 +188,9 @@
     function formatDateForCalendar(dateStr, timeStr) {
         // dd.mm.yyyy -> [dd, mm, yyyy]
         const [day, month, year] = dateStr.split('.').map(s => s.padStart(2, '0'));
-        // hh:mm -> hhmm
-        const time = timeStr.replace(':', ''); 
+        // hh:mm -> hhmm (entfernt " Uhr" und Leerzeichen)
+        const timeCleaned = timeStr.replace(' Uhr', '').replace(/\s/g, ''); 
+        const time = timeCleaned.replace(':', ''); 
         return `${year}${month}${day}T${time}00Z`; // Fügt Sekunden und Z (Zulu/UTC) hinzu
     }
 
@@ -201,12 +202,12 @@
         const startDate = formatDateForCalendar(event.date, event.time);
         
         // Endezeit ist 30 Minuten später
-        const [hour, minute] = event.time.split(':').map(Number);
-        const endDate = new Date();
-        endDate.setHours(hour);
-        endDate.setMinutes(minute + 30);
-        const endHour = endDate.getHours().toString().padStart(2, '0');
-        const endMinute = endDate.getMinutes().toString().padStart(2, '0');
+        const [hour, minute] = event.time.replace(' Uhr', '').split(':').map(Number);
+        const endDateObj = new Date();
+        endDateObj.setHours(hour);
+        endDateObj.setMinutes(minute + 30);
+        const endHour = endDateObj.getHours().toString().padStart(2, '0');
+        const endMinute = endDateObj.getMinutes().toString().padStart(2, '0');
         const formattedEndDate = formatDateForCalendar(event.date, `${endHour}:${endMinute}`);
         
         const details = encodeURIComponent("Webinar zu den neuen Features des Google Pixel 10 Pro Fold und der Pixel Watch 4.\nMeeting Link: https://" + event.link);
@@ -223,12 +224,12 @@
         const startDate = formatDateForCalendar(event.date, event.time);
         
         // Endezeit ist 30 Minuten später
-        const [hour, minute] = event.time.split(':').map(Number);
-        const endDate = new Date();
-        endDate.setHours(hour);
-        endDate.setMinutes(minute + 30);
-        const endHour = endDate.getHours().toString().padStart(2, '0');
-        const endMinute = endDate.getMinutes().toString().padStart(2, '0');
+        const [hour, minute] = event.time.replace(' Uhr', '').split(':').map(Number);
+        const endDateObj = new Date();
+        endDateObj.setHours(hour);
+        endDateObj.setMinutes(minute + 30);
+        const endHour = endDateObj.getHours().toString().padStart(2, '0');
+        const endMinute = endDateObj.getMinutes().toString().padStart(2, '0');
         const formattedEndDate = formatDateForCalendar(event.date, `${endHour}:${endMinute}`);
 
         const description = "Webinar zu den neuen Features des Google Pixel 10 Pro Fold und der Pixel Watch 4. Meeting Link: https://" + event.link;
@@ -254,7 +255,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Training_${event.date.replace(/\./g, '')}_${event.time.replace(':', '')}.ics`;
+        a.download = `Training_${event.date.replace(/\./g, '')}_${event.time.replace(':', '').replace(' Uhr', '')}.ics`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -277,7 +278,7 @@
         const closeModalTop = document.getElementById('close-modal-top');
 
         document.getElementById('event-date-display').textContent = event.date;
-        document.getElementById('event-time-display').textContent = event.time + " Uhr";
+        document.getElementById('event-time-display').textContent = event.time; // Zeigt die exakte Zeit aus dem Event an
 
         const optionsContainer = document.getElementById('calendar-options');
         optionsContainer.innerHTML = `
@@ -327,28 +328,33 @@
     const userId = crypto.randomUUID(); 
     
     // --- KALENDER DATEN (WIE VORHER) ---
-    const CALENDAR_EVENTS = [
-        { date: "09.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "09.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "10.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "10.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "13.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "13.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "14.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "14.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "15.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "15.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "16.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "16.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "17.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "17.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "20.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "20.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "21.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "21.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "22.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
-        { date: "22.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
-    ];
+    // Parse die CSV-Daten
+    const csvData = `Datum,Uhrzeit,Link
+09.10.2025,09:00 Uhr,meet.google.com/knh-yitj-qaj
+09.10.2025,14:00 Uhr,meet.google.com/knh-yitj-qaj
+10.10.2025,09:00 Uhr,meet.google.com/knh-yitj-qaj
+10.10.2025,14:00 Uhr,meet.google.com/knh-yitj-qaj
+13.10.2025,09:00 Uhr,meet.google.com/knh-yitj-qaj
+13.10.2025,14:00 Uhr,meet.google.com/knh-yitj-qaj
+14.10.2025,09:00 Uhr,meet.google.com/knh-yitj-qaj
+14.10.2025,14:00 Uhr,meet.google.com/knh-yitj-qaj
+15.10.2025,09:00 Uhr,meet.google.com/knh-yitj-qaj
+15.10.2025,14:00 Uhr,meet.google.com/knh-yitj-qaj
+16.10.2025,09:00 Uhr,meet.google.com/knh-yitj-qaj
+16.10.2025,14:00 Uhr,meet.google.com/knh-yitj-qaj
+17.10.2025,09:00 Uhr,meet.google.com/knh-yitj-qaj
+17.10.2025,14:00 Uhr,meet.google.com/knh-yitj-qaj
+20.10.2025,09:00 Uhr,meet.google.com/knh-yitj-qaj
+20.10.2025,14:00 Uhr,meet.google.com/knh-yitj-qaj
+21.10.2025,09:00 Uhr,meet.google.com/knh-yitj-qaj
+21.10.2025,14:00 Uhr,meet.google.com/knh-yitj-qaj
+22.10.2025,09:00 Uhr,meet.google.com/knh-yitj-qaj
+22.10.2025,14:00 Uhr,meet.google.com/knh-yitj-qaj`;
+
+    const CALENDAR_EVENTS = csvData.split('\n').slice(1).map(row => {
+        const [date, time, link] = row.split(',');
+        return { date: date.trim(), time: time.trim(), link: link.trim() };
+    });
     // --- ENDE KALENDER DATEN ---
 
     // Die QUESTIONS sind unverändert und bleiben hier. (Linien ~383 - ~550)
@@ -587,7 +593,7 @@
                         <span class="font-semibold text-gray-800">${event.date}</span>
                     </div>
                     <span class="font-mono text-google-blue flex items-center text-sm">
-                        <i data-lucide="clock" class="w-4 h-4 mr-1"></i> ${event.time} Uhr
+                        <i data-lucide="clock" class="w-4 h-4 mr-1"></i> ${event.time} 
                     </span>
                 </button>
             `;
@@ -615,7 +621,7 @@
      */
     function renderNameInputScreen() {
         const selectedDateText = selectedEvent 
-            ? `Dein Termin am **${selectedEvent.date} um ${selectedEvent.time} Uhr** ist vorgemerkt.`
+            ? `Dein Termin am **${selectedEvent.date} um ${selectedEvent.time}** ist vorgemerkt.`
             : `Bitte gib Deinen Namen ein, um das Quiz zu starten (Pflichtfelder).`;
 
         quizContainer.innerHTML = `
@@ -631,4 +637,4 @@
                         class="w-full p-3 border border-pixel-gray rounded-lg focus:ring-google-blue focus:border-google-blue transition duration-150">
                 </div>
                 <div class="mb-6">
-                    <label for="last-name" class="
+                    <label for="last-
