@@ -90,6 +90,22 @@
             text-decoration: none;
             cursor: pointer;
         }
+
+        /* Styling für Scrollbar bei Terminen (nur für Web-Vorschau) */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
     </style>
     <script>
         tailwind.config = {
@@ -131,7 +147,7 @@
 <!-- Interaktives Kalender Modal (Pop-up) -->
 <div id="calendar-popover" class="modal">
     <div class="modal-content">
-        <span class="close-button">&times;</span>
+        <span class="close-button" id="close-modal-top">&times;</span>
         <h3 class="text-xl font-bold mb-4 text-gray-800 flex items-center">
             <i data-lucide="calendar-check" class="w-5 h-5 mr-2 text-google-blue"></i> Termin speichern
         </h3>
@@ -139,17 +155,17 @@
         <div class="space-y-3" id="calendar-options">
             <!-- Dynamische Links hier eingefügt -->
         </div>
+        <button id="close-modal-btn" class="w-full mt-4 bg-pixel-gray text-gray-800 p-3 rounded-lg font-semibold hover:bg-pixel-gray/70 transition duration-150">
+            Schließen & zum Quiz
+        </button>
     </div>
 </div>
 
 <script>
     // --- Globale Kalender-Funktionen, die vom HTML-onclick benötigt werden ---
-    // Diese Funktionen MÜSSEN außerhalb des <script type="module"> Blocks liegen,
-    // um über onclick="..." im HTML global zugreifbar zu sein.
-
+    
     /**
      * Helper: Formatiert Datum und Zeit in das ISO-ähnliche UTC-Format (YYYYMMDDTHHMMSSZ) für Kalender.
-     * Nimmt dd.mm.yyyy und hh:mm an.
      */
     function formatDateForCalendar(dateStr, timeStr) {
         // dd.mm.yyyy -> [dd, mm, yyyy]
@@ -212,11 +228,23 @@
     }
     
     /**
-     * Öffnet das Modal und füllt es mit den Kalenderoptionen.
+     * Öffnet das Modal und füllt es mit den Kalenderoptionen und speichert das Event, um zum Quiz zu wechseln.
      */
     function openCalendarModal(event) {
+        // Diese globale Funktion greift auf die Variable `currentScreen` und die Funktion `render`
+        // aus dem Modul-Skript zu, da sie außerhalb des Moduls liegt, aber innerhalb des `body`-Kontexts.
+
+        // 1. Event speichern und zum Quiz wechseln
+        if (typeof window.quizApp === 'object' && typeof window.quizApp.selectEventAndProceed === 'function') {
+            window.quizApp.selectEventAndProceed(event);
+        } else {
+            console.error("Quiz App State nicht initialisiert. Kann Event nicht speichern und fortfahren.");
+        }
+
+        // 2. Modal-Inhalt füllen und anzeigen
         const modal = document.getElementById('calendar-popover');
-        const closeModal = document.querySelector('.close-button');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const closeModalTop = document.getElementById('close-modal-top');
 
         document.getElementById('event-date-display').textContent = event.date;
         document.getElementById('event-time-display').textContent = event.time + " Uhr";
@@ -238,11 +266,12 @@
         };
 
         modal.style.display = "block";
-        // Muss hier aufgerufen werden, um Icons im Modal zu erstellen
         if (typeof lucide !== 'undefined') { lucide.createIcons(); }
         
-        // Fügt Schließen-Handler hinzu (da das Modal global ist)
-        closeModal.onclick = () => { modal.style.display = "none"; };
+        // Schließen-Handler, um nur das Modal zu schließen
+        const closeHandler = () => { modal.style.display = "none"; };
+        closeModalBtn.onclick = closeHandler;
+        closeModalTop.onclick = closeHandler;
         window.onclick = (event) => {
             if (event.target == modal) { modal.style.display = "none"; }
         };
@@ -251,26 +280,23 @@
 
 
 <script type="module">
-    // *** KEINE FIREBASE MEHR BENÖTIGT ***
+    // *** MODUL BEGINNT ***
 
     const quizContainer = document.getElementById('quiz-container');
+    const GOOGLE_SHEETS_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsg_ySSpTeWIjxQnjnbrvx-dKTe1OmvIkgZDqo5gN3XNiDUSiGYNwzT2pkUb6GCkqeNA/exec"; 
 
-    // Zustände für das Quiz
-    let currentScreen = 'start'; // 'start', 'quiz', 'results'
+    // --- ZUSTÄNDE ---
+    let currentScreen = 'calendar'; // NEU: Startet mit der Kalenderansicht
     let currentQuestionIndex = 0;
     let score = 0;
     let firstName = '';
     let lastName = '';
     let quizSubmitted = false;
+    let selectedEvent = null; // NEU: Hält das ausgewählte Event
     
-    // Platzhalter für App ID und User ID für die Sheets-Übertragung
     const userId = crypto.randomUUID(); 
-    const appId = 'standalone-quiz-app';
-
-    // HIER IST DIE URL FÜR DAS GOOGLE APPS SCRIPT
-    const GOOGLE_SHEETS_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsg_ySSpTeWIjxQnjnbrvx-dKTe1OmvIkgZDqo5gN3XNiDUSiGYNwzT2pkUb6GCkqeNA/exec"; 
-
-    // --- KALENDER DATEN AUS CSV (Termine Fold Training) ---
+    
+    // --- KALENDER DATEN (WIE VORHER) ---
     const CALENDAR_EVENTS = [
         { date: "09.10.2025", time: "09:00", link: "meet.google.com/knh-yitj-qaj" },
         { date: "09.10.2025", time: "14:00", link: "meet.google.com/knh-yitj-qaj" },
@@ -309,6 +335,7 @@
     ];
     // --- ENDE KALENDER DATEN ---
 
+    // Die QUESTIONS sind unverändert und bleiben hier. (Linien ~383 - ~550)
     const QUESTIONS = [
         {
             id: 1,
@@ -463,6 +490,18 @@
     ];
 
     /**
+     * Macht die Zustandsverwaltung im Modul für globale Funktionen zugänglich (für openCalendarModal).
+     */
+    window.quizApp = {
+        selectEventAndProceed: (event) => {
+            selectedEvent = event;
+            currentScreen = 'start'; // Wechsel zur Namenseingabe
+            render();
+        }
+    };
+
+
+    /**
      * Speichert die Ergebnisse ausschließlich an Google Sheets.
      */
     async function saveResult() {
@@ -475,7 +514,8 @@
             lastName: lastName,
             score: score,
             totalQuestions: QUESTIONS.length,
-            feedback: '', 
+            selectedEventDate: selectedEvent ? selectedEvent.date : 'N/A', // Speichert den gebuchten Termin
+            selectedEventTime: selectedEvent ? selectedEvent.time : 'N/A', 
             timestamp: new Date()
         };
 
@@ -509,13 +549,53 @@
     // --- RENDERING FUNKTIONEN ---
 
     /**
-     * Rendert den Startbildschirm zur Eingabe von Name und Nachname.
+     * NEU: Rendert den ersten Bildschirm zur Terminauswahl.
      */
-    function renderStartScreen() {
+    function renderCalendarSelectionScreen() {
+        let calendarHtml = CALENDAR_EVENTS.map(event => {
+            // openCalendarModal ist jetzt global definiert
+            return `
+                <button data-date="${event.date}" data-time="${event.time}" 
+                        class="w-full text-left p-3 mb-2 border border-google-blue/30 bg-white rounded-lg hover:bg-google-blue/10 transition duration-150 flex justify-between items-center calendar-button"
+                        onclick="openCalendarModal({date: '${event.date}', time: '${event.time}', link: '${event.link}'})">
+                    <span class="font-semibold text-gray-800">${event.date}</span>
+                    <span class="font-mono text-google-blue flex items-center">
+                        <i data-lucide="clock" class="w-4 h-4 mr-1"></i> ${event.time} Uhr
+                    </span>
+                </button>
+            `;
+        }).join('');
+
         quizContainer.innerHTML = `
-            <!-- Überschrift: Willkommen -->
+            <h2 class="text-2xl font-bold mb-6 text-gray-800">Terminbuchung</h2>
+            <p class="mb-6 text-gray-600">Bitte wähle zuerst Deinen gewünschten Trainingstermin aus. Nach der Auswahl gelangst Du direkt zum Quiz.</p>
+            
+            <div class="mt-4">
+                <h3 class="text-xl font-bold mb-4 text-google-blue flex items-center">
+                    <i data-lucide="calendar" class="w-5 h-5 mr-2"></i> Wähle Dein Training
+                </h3>
+                <div class="max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                    ${calendarHtml}
+                </div>
+            </div>
+        `;
+        if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+    }
+
+
+    /**
+     * Rendert den Namenseingabebildschirm (Nach der Terminauswahl).
+     */
+    function renderNameInputScreen() {
+        const selectedDateText = selectedEvent 
+            ? `Dein Termin am **${selectedEvent.date} um ${selectedEvent.time} Uhr** ist vorgemerkt.`
+            : `Bitte gib Deinen Namen ein, um das Quiz zu starten (Pflichtfelder).`;
+
+        quizContainer.innerHTML = `
             <h2 class="text-2xl font-bold mb-6 text-gray-800">Willkommen</h2>
-            <p class="mb-6 text-gray-600">Bitte gib Deinen Namen ein, um das Quiz zu starten (Pflichtfelder).</p>
+            <p class="mb-6 text-google-blue font-semibold text-center p-3 border border-google-blue/30 rounded-lg">
+                <i data-lucide="check" class="w-4 h-4 inline-block mr-1"></i> ${selectedDateText}
+            </p>
 
             <form id="start-form">
                 <div class="mb-4">
@@ -528,8 +608,8 @@
                     <input type="text" id="last-name" name="last-name" value="${lastName}" placeholder="Dein Nachname" required
                         class="w-full p-3 border border-pixel-gray rounded-lg focus:ring-google-blue focus:border-google-blue transition duration-150">
                 </div>
-                <button type="submit" class="w-full bg-google-blue text-white p-3 rounded-lg font-semibold hover:bg-opacity-90 transition duration-150 flex items-center justify-center">
-                    Quiz starten <i data-lucide="arrow-right" class="w-5 h-5 ml-2"></i>
+                <button type="submit" class="w-full bg-google-green text-white p-3 rounded-lg font-semibold hover:bg-opacity-90 transition duration-150 flex items-center justify-center">
+                    Start Quiz <i data-lucide="arrow-right" class="w-5 h-5 ml-2"></i>
                 </button>
             </form>
         `;
@@ -546,12 +626,12 @@
         if (typeof lucide !== 'undefined') { lucide.createIcons(); }
     }
 
+
     /**
-     * Rendert die aktuelle Quizfrage.
+     * Rendert die aktuelle Quizfrage. (Unverändert)
      */
     function renderQuizQuestion() {
         const q = QUESTIONS[currentQuestionIndex];
-        // Die letzte Frage führt direkt zu den Ergebnissen
         const isLastQuestion = currentQuestionIndex === QUESTIONS.length - 1; 
 
         let optionsHtml = '';
@@ -651,7 +731,6 @@
         nextButton.addEventListener('click', () => {
             if (!isAnswered) return;
             if (isLastQuestion) {
-                // Bei der letzten Frage direkt zu den Ergebnissen springen und speichern
                 saveResult(); 
                 currentScreen = 'results';
             } else {
@@ -663,23 +742,9 @@
     }
 
     /**
-     * Rendert den Ergebnisbildschirm.
+     * Rendert den Ergebnisbildschirm. (Kalender entfernt)
      */
     function renderResultsScreen() {
-        let calendarHtml = CALENDAR_EVENTS.map(event => {
-            // openCalendarModal ist jetzt global definiert
-            return `
-                <button data-date="${event.date}" data-time="${event.time}" 
-                        class="w-full text-left p-3 mb-2 border border-google-blue/30 bg-white rounded-lg hover:bg-google-blue/10 transition duration-150 flex justify-between items-center calendar-button"
-                        onclick="openCalendarModal({date: '${event.date}', time: '${event.time}', link: '${event.link}'})">
-                    <span class="font-semibold text-gray-800">${event.date}</span>
-                    <span class="font-mono text-google-blue flex items-center">
-                        <i data-lucide="clock" class="w-4 h-4 mr-1"></i> ${event.time} Uhr
-                    </span>
-                </button>
-            `;
-        }).join('');
-
         quizContainer.innerHTML = `
             <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center">
                 Quiz beendet! <i data-lucide="bar-chart-2" class="w-5 h-5 ml-2 text-google-green"></i>
@@ -690,19 +755,13 @@
             
             <p class="text-sm text-gray-700 mb-6 font-semibold flex items-center justify-center">
                <i data-lucide="check-check" class="w-4 h-4 inline-block mr-1 text-google-blue"></i> 
-               Deine Daten wurden erfolgreich an die Google Tabelle gesendet.
+               Deine Daten (inkl. Terminauswahl) wurden erfolgreich an die Google Tabelle gesendet.
             </p>
-
-            <!-- NEUES FELD: Kalendertermine -->
-            <div class="mt-8 pt-4 border-t border-pixel-gray">
-                <h3 class="text-xl font-bold mb-4 text-google-blue flex items-center">
-                    <i data-lucide="calendar" class="w-5 h-5 mr-2"></i> Termine buchen (Fold Training)
-                </h3>
-                <p class="mb-4 text-gray-600 text-sm">Wähle Deinen Wunschtermin für das vertiefende Training und speichere ihn direkt in Deinem Kalender.</p>
-                <div class="max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                    ${calendarHtml}
-                </div>
-            </div>
+            
+            <p class="text-base text-gray-800 mt-6 font-semibold text-center">
+                Vielen Dank für Deine Teilnahme! Wir sehen uns beim Training am <br>
+                <span class="text-google-red">${selectedEvent.date} um ${selectedEvent.time} Uhr</span>!
+            </p>
 
             <button id="restart-button" class="w-full mt-8 bg-google-red text-white p-3 rounded-lg font-semibold hover:bg-opacity-90 transition duration-150 flex items-center justify-center">
                 <i data-lucide="rotate-ccw" class="w-5 h-5 mr-2"></i> Neues Quiz starten
@@ -710,12 +769,13 @@
         `;
 
         document.getElementById('restart-button').addEventListener('click', () => {
-            currentScreen = 'start';
+            currentScreen = 'calendar'; // NEU: Startet wieder bei der Kalenderansicht
             currentQuestionIndex = 0;
             score = 0;
             firstName = '';
             lastName = '';
             quizSubmitted = false;
+            selectedEvent = null;
             render();
         });
         
@@ -728,8 +788,10 @@
      */
     function render() {
         quizContainer.innerHTML = '';
-        if (currentScreen === 'start') {
-            renderStartScreen();
+        if (currentScreen === 'calendar') {
+            renderCalendarSelectionScreen();
+        } else if (currentScreen === 'start') {
+            renderNameInputScreen();
         } else if (currentScreen === 'quiz') {
             renderQuizQuestion();
         } else if (currentScreen === 'results') {
