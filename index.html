@@ -231,9 +231,6 @@
      * Öffnet das Modal und füllt es mit den Kalenderoptionen und speichert das Event, um zum Quiz zu wechseln.
      */
     function openCalendarModal(event) {
-        // Diese globale Funktion greift auf die Variable `currentScreen` und die Funktion `render`
-        // aus dem Modul-Skript zu, da sie außerhalb des Moduls liegt, aber innerhalb des `body`-Kontexts.
-
         // 1. Event speichern und zum Quiz wechseln
         if (typeof window.quizApp === 'object' && typeof window.quizApp.selectEventAndProceed === 'function') {
             window.quizApp.selectEventAndProceed(event);
