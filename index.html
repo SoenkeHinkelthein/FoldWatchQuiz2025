@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel 10 Pro Fold & Watch 4 Quiz</title>
+    <!-- Lade Tailwind CSS für das Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lade Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Angepasste Schriftart und Hintergrund */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+            position: relative; /* Wichtig für absolute positionierte Kinder-Elemente */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            /* Hintergrundbild direkt auf Body setzen */
+            background-image: url('https://i.postimg.cc/kGsKH6sP/Bildschirmfoto-2025-10-06-um-09-38-23.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: scroll; /* Muss 'scroll' sein, nicht 'fixed' für iFrames */
+        }
+        
+        /* Overlay für helleren Hintergrund mit Transparenz */
+        body::before {
+            content: "";
+            position: absolute; /* Muss absolute sein, um im iFrame zu funktionieren */
+            top: 0;
+            left: 0;
+            width: 100%;
+            /* min-height 100vh sorgt dafür, dass es den gesamten sichtbaren Bereich abdeckt,
+               wenn der Inhalt nicht scrollt, wird height 100% benötigt */
+            height: 100%; 
+            min-height: 100vh;
+            background-color: rgba(255, 255, 255, 0.4); /* Weiß-Overlay für mehr Lesbarkeit (40% Transparenz) */
+            z-index: -1;
+        }
+
+        .container-card {
+            max-width: 600px;
+            margin: 1rem auto; 
+            /* Leichte Transparenz für die Quiz-Karte */
+            background: rgba(255, 255, 255, 0.95); /* Leicht erhöhte Deckkraft */
+            padding: 2rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+        }
+        /* Kontrastreiche Header-Farben (Schwarz) */
+        header h1, header p {
+             color: #1f2937; /* Schwarz/Dunkelgrau für Lesbarkeit auf hellem Overlay */
+             text-shadow: 0 0px 4px rgba(255, 255, 255, 0.6); /* Leichter Schatten */
+        }
+        /* Alle Texte innerhalb der weißen Box sind wieder dunkel, um auf weißem Grund lesbar zu sein */
+        .container-card h2, .container-card p, .container-card label {
+            color: #1f2937;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'google-blue': '#4285F4',
+                        'google-green': '#34A853',
+                        'google-yellow': '#FBBC05',
+                        'google-red': '#EA4335',
+                        'pixel-gray': '#e8eaed',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body>
+
+<!-- pt-48 (192px) für großen Abstand oben. -->
+<div id="app" class="p-4 sm:p-8 pt-48 pb-10"> 
+    <header class="text-center mb-10">
+        <!-- Überschrift: It's Quiz Time -->
+        <h1 class="text-3xl sm:text-4xl font-extrabold flex items-center justify-center">
+            <span class="mr-2">🚀</span>
+            It´s Quiz Time 🚀
+        </h1>
+        <p class="text-xl font-semibold mt-2">Teste Dein Wissen zu Pixel 10 Pro Fold & Watch 4!</p>
+    </header>
+
+    <div id="quiz-container" class="container-card">
+        <!-- Inhalte werden per JavaScript eingefügt -->
+        <div class="text-center py-10">
+            <p class="mt-4 text-gray-600">Initialisierung des Quiz...</p>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    // *** KEINE FIREBASE MEHR BENÖTIGT ***
+
+    const quizContainer = document.getElementById('quiz-container');
+
+    // Zustände für das Quiz
+    let currentScreen = 'start'; // 'start', 'quiz', 'results'
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let firstName = '';
+    let lastName = '';
+    let quizSubmitted = false;
+    
+    // Platzhalter für App ID und User ID für die Sheets-Übertragung
+    const userId = crypto.randomUUID(); // Eindeutige ID für jeden Durchlauf
+    const appId = 'standalone-quiz-app';
+
+    // HIER IST DIE URL FÜR DAS GOOGLE APPS SCRIPT
+    const GOOGLE_SHEETS_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsg_ySSpTeWIjxQnjnbrvx-dKTe1OmvIkgZDqo5gN3XNiDUSiGYNwzT2pkUb6GCkqeNA/exec"; 
+
+    // Fragen wie in der letzten funktionierenden Version (ohne Gemini-Features)
+    const QUESTIONS = [
+        {
+            id: 1,
+            type: 'mc',
+            question: "Welchen Prozessor verwendet das Pixel 10 Pro Fold? 🧠",
+            options: ["Snapdragon 8 Gen 3", "Samsung Exynos 2500", "Google Tensor G5", "Apple M2"],
+            correctAnswer: "Google Tensor G5",
+            emoji: "✨"
+        },
+        {
+            id: 2,
+            type: 'tf',
+            question: "Die Pixel Watch 4 (45 mm) bietet eine längere Akkulaufzeit als die 41 mm Version.",
+            correctAnswer: true,
+            emoji: "🔋"
+        },
+        {
+            id: 3,
+            type: 'mc',
+            question: "Welche Speicheroption wird beim Pixel 10 Pro Fold als 'Neu' beworben?",
+            options: ["256 GB", "512 GB", "1 TB", "2 TB"],
+            correctAnswer: "1 TB",
+            emoji: "💾"
+        },
+        {
+            id: 4,
+            type: 'tf',
+            question: "Das Pixel 10 Pro Fold hat mit IP68 die gleiche Wasser- und Staubschutzklasse wie das Samsung Galaxy Z Fold7 (IP48).",
+            correctAnswer: false, // Fold7 hat IP48, P10 Pro Fold hat IP68
+            emoji: "💧"
+        },
+        {
+            id: 5,
+            type: 'mc',
+            question: "Welche Zoomstufe (Teleobjektiv) bietet das Pixel 10 Pro Fold? 🔭",
+            options: ["3-fach", "3,5-fach", "4-fach", "5-fach"],
+            correctAnswer: "5-fach",
+            emoji: "🔍"
+        },
+        {
+            id: 6,
+            type: 'tf',
+            question: "Das Display der Pixel Watch 4 ist mit 3D Corning Gorilla Glass 5 ausgestattet und kratzbeständig.",
+            correctAnswer: true,
+            emoji: "🛡️"
+        },
+        {
+            id: 7,
+            type: 'mc',
+            question: "Welche Funktion ermöglicht es, eine Vorschau des Fotos auf dem äußeren Display des Pixel 10 Pro Fold zu sehen, bevor Du es aufnimmst?",
+            options: ["Sofortansicht", "Blickfang", "Dual Screen-Vorschau", "Fold Kamerasystem"],
+            correctAnswer: "Dual Screen-Vorschau",
+            emoji: "🤳"
+        },
+        {
+            id: 8,
+            type: 'tf',
+            question: "Die Pixel Watch 4 verfügt über verbesserte Multispektralsensoren der 3. Generation.",
+            correctAnswer: true,
+            emoji: "⌚"
+        },
+        {
+            id: 9,
+            type: 'mc',
+            question: "Wie groß ist das Innendisplay des Pixel 10 Pro Fold (Diagonale)? 🖥️",
+            options: ["7,8 Zoll", "6,9 Zoll", "8,0 Zoll", "8,2 Zoll"],
+            correctAnswer: "8,0 Zoll",
+            emoji: "📐"
+        },
+        {
+            id: 10,
+            type: 'tf',
+            question: "Die Pixel Watch 4 lädt 50 % schneller und bietet 50 % längere Akkulaufzeit als die Pixel Watch 3.",
+            correctAnswer: false, // Es sind 25% schneller und 25% länger
+            emoji: "⚡"
+        },
+        {
+            id: 11,
+            type: 'mc',
+            question: "Welches Konkurrenzmodell bietet die höchste Akkukapazität von 5.150 mAh? (Vergleichsdaten Fold)",
+            options: ["Galaxy Z Fold7", "Honor Magic V3", "OnePlus Open", "Pixel 10 Pro Fold"],
+            correctAnswer: "Honor Magic V3",
+            emoji: "🥇"
+        },
+        {
+            id: 12,
+            type: 'tf',
+            question: "Das Pixel 10 Pro Fold besitzt ein 'Neu gestaltetes Scharnier ohne Zahnrad'.",
+            correctAnswer: true,
+            emoji: "🛠️"
+        },
+        {
+            id: 13,
+            type: 'mc',
+            question: "Wie lange ist das Google AI Pro Probeabo beim Kauf des Pixel 10 Pro Fold inklusive? (Gemini-Funktionen)",
+            options: ["3 Monate", "6 Monate", "1 Jahr", "2 Jahre"],
+            correctAnswer: "1 Jahr",
+            emoji: "💡"
+        },
+        {
+            id: 14,
+            type: 'tf',
+            question: "Das Actua 360-Display der Pixel Watch 4 ist 10 % heller als das Vorgängermodell.",
+            correctAnswer: false, // Es ist 50% heller
+            emoji: "🔆"
+        },
+        {
+            id: 15,
+            type: 'mc',
+            question: "Welche Google-Funktion nutzt das Kamerabild in Echtzeit, um Fragen zu stellen? 💬",
+            options: ["Sofortansicht", "Gemini Live mit Kamera", "Live-Übersetzung", "Google Lens"],
+            correctAnswer: "Gemini Live mit Kamera",
+            emoji: "🎤"
+        },
+        {
+            id: 16,
+            type: 'tf',
+            question: "Mit der 'Splitscreen'-Funktion kannst Du Inhalte per Drag-and-drop zwischen kompatiblen Apps auf dem Pixel 10 Pro Fold verschieben.",
+            correctAnswer: true,
+            emoji: "🧩"
+        },
+        {
+            id: 17,
+            type: 'mc',
+            question: "Die Videogenerierung in Gemini wird beim Pixel 10 Pro Fold durch welche Technologie unterstützt? 🎥",
+            options: ["Gemini 4", "Imagen 3", "Veo 3", "DeepMind"],
+            correctAnswer: "Veo 3",
+            emoji: "🎬"
+        },
+        {
+            id: 18,
+            type: 'tf',
+            question: "Die Pixel Watch 4 unterstützt genaues GPS-Tracking im Gelände durch Zweifrequenz-GPS.",
+            correctAnswer: true,
+            emoji: "📍"
+        },
+        {
+            id: 19,
+            type: 'mc',
+            question: "Welcher Fold-Konkurrent bietet eine 3-fach-Teleobjektiv-Kamera mit 64 MP? (Vergleichsdaten)",
+            options: ["Galaxy Z Fold7", "Honor Magic V3", "OnePlus Open", "Xiaomi Mix Fold 4"],
+            correctAnswer: "OnePlus Open",
+            emoji: "📸"
+        },
+        {
+            id: 20,
+            type: 'tf',
+            question: "Die Pixel Watch 4 (45 mm) erreicht eine Akkulaufzeit von bis zu 40 Stunden.",
+            correctAnswer: true,
+            emoji: "⏳"
+        }
+    ];
+
+    /**
+     * Speichert die Ergebnisse ausschließlich an Google Sheets.
+     */
+    async function saveResult() {
+        if (quizSubmitted) return;
+
+        // Erstellt das Datenobjekt für das Google Apps Script
+        const resultData = {
+            userId: userId,
+            firstName: firstName,
+            lastName: lastName,
+            score: score,
+            totalQuestions: QUESTIONS.length,
+            feedback: '', 
+            timestamp: new Date()
+        };
+
+        // 1. An Google Sheets (Apps Script) senden
+        if (GOOGLE_SHEETS_APPS_SCRIPT_URL.startsWith("https://")) {
+            try {
+                const response = await fetch(GOOGLE_SHEETS_APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    body: JSON.stringify(resultData),
+                });
+                quizSubmitted = true; 
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    console.log("Daten erfolgreich an Google Sheet gesendet!");
+                } else {
+                    console.error("Fehler beim Senden an Google Sheet:", result.message);
+                }
+            } catch (error) {
+                console.error("Netzwerkfehler beim Senden an Google Sheet:", error);
+            }
+        } else {
+             console.warn("Apps Script URL fehlt oder ist fehlerhaft.");
+        }
+
+        // Aktualisiert den Bildschirm, um den Erfolg anzuzeigen
+        render();
+    }
+
+    // --- RENDERING FUNKTIONEN ---
+
+    /**
+     * Rendert den Startbildschirm zur Eingabe von Name und Nachname.
+     */
+    function renderStartScreen() {
+        quizContainer.innerHTML = `
+            <!-- Überschrift: Willkommen -->
+            <h2 class="text-2xl font-bold mb-6 text-gray-800">Willkommen</h2>
+            <p class="mb-6 text-gray-600">Bitte gib Deinen Namen ein, um das Quiz zu starten (Pflichtfelder).</p>
+
+            <form id="start-form">
+                <div class="mb-4">
+                    <label for="first-name" class="block text-sm font-medium text-gray-700 mb-1">Vorname *</label>
+                    <input type="text" id="first-name" name="first-name" value="${firstName}" placeholder="Dein Vorname" required
+                        class="w-full p-3 border border-pixel-gray rounded-lg focus:ring-google-blue focus:border-google-blue transition duration-150">
+                </div>
+                <div class="mb-6">
+                    <label for="last-name" class="block text-sm font-medium text-gray-700 mb-1">Nachname *</label>
+                    <input type="text" id="last-name" name="last-name" value="${lastName}" placeholder="Dein Nachname" required
+                        class="w-full p-3 border border-pixel-gray rounded-lg focus:ring-google-blue focus:border-google-blue transition duration-150">
+                </div>
+                <button type="submit" class="w-full bg-google-blue text-white p-3 rounded-lg font-semibold hover:bg-opacity-90 transition duration-150 flex items-center justify-center">
+                    Quiz starten <i data-lucide="arrow-right" class="w-5 h-5 ml-2"></i>
+                </button>
+            </form>
+        `;
+
+        document.getElementById('start-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            firstName = document.getElementById('first-name').value.trim();
+            lastName = document.getElementById('last-name').value.trim();
+            if (firstName && lastName) {
+                currentScreen = 'quiz';
+                render();
+            }
+        });
+        lucide.createIcons();
+    }
+
+    /**
+     * Rendert die aktuelle Quizfrage.
+     */
+    function renderQuizQuestion() {
+        const q = QUESTIONS[currentQuestionIndex];
+        // Die letzte Frage führt direkt zu den Ergebnissen
+        const isLastQuestion = currentQuestionIndex === QUESTIONS.length - 1; 
+
+        let optionsHtml = '';
+        if (q.type === 'mc') {
+            optionsHtml = q.options.map(option => `
+                <button data-answer="${option}" class="w-full text-left p-4 mb-3 border border-pixel-gray bg-white rounded-xl hover:bg-pixel-gray/50 transition duration-150 option-button">
+                    ${option}
+                </button>
+            `).join('');
+        } else if (q.type === 'tf') {
+            optionsHtml = `
+                <div class="flex space-x-4">
+                    <button data-answer="true" class="flex-1 p-4 border border-pixel-gray bg-white rounded-xl hover:bg-pixel-gray/50 transition duration-150 option-button">
+                        Richtig <i data-lucide="check" class="w-5 h-5 inline-block ml-1 text-google-green"></i>
+                    </button>
+                    <button data-answer="false" class="flex-1 p-4 border border-pixel-gray bg-white rounded-xl hover:bg-pixel-gray/50 transition duration-150 option-button">
+                        Falsch <i data-lucide="x" class="w-5 h-5 inline-block ml-1 text-google-red"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        quizContainer.innerHTML = `
+            <div class="text-center mb-6 text-sm font-medium text-google-blue">
+                Frage ${currentQuestionIndex + 1} von ${QUESTIONS.length}
+            </div>
+            <div class="p-6 bg-pixel-gray/30 rounded-xl mb-8">
+                <div class="text-4xl mb-4 text-center">${q.emoji}</div>
+                <h2 class="text-xl font-semibold text-gray-900 text-center">${q.question}</h2>
+            </div>
+            <div id="options-container" class="space-y-3">
+                ${optionsHtml}
+            </div>
+            <div id="message" class="mt-4 text-center font-bold"></div>
+            <div class="mt-8">
+                <button id="next-button" class="w-full bg-google-green text-white p-3 rounded-lg font-semibold transition duration-150 opacity-50 cursor-not-allowed" disabled>
+                    ${isLastQuestion ? 'Zum Ergebnis speichern' : 'Nächste Frage'} <i data-lucide="chevron-right" class="w-5 h-5 inline-block ml-1"></i>
+                </button>
+            </div>
+        `;
+
+        const optionsContainer = document.getElementById('options-container');
+        const nextButton = document.getElementById('next-button');
+        const messageDiv = document.getElementById('message');
+
+        let isAnswered = false;
+
+        optionsContainer.addEventListener('click', (e) => {
+            if (isAnswered) return;
+            const button = e.target.closest('.option-button');
+            if (!button) return;
+
+            isAnswered = true;
+            const userAnswer = button.getAttribute('data-answer');
+            let isCorrect;
+
+            if (q.type === 'mc') {
+                isCorrect = userAnswer === q.correctAnswer;
+            } else if (q.type === 'tf') {
+                isCorrect = userAnswer === String(q.correctAnswer);
+            }
+
+            // Visuelles Feedback
+            document.querySelectorAll('.option-button').forEach(btn => {
+                btn.disabled = true;
+                btn.classList.remove('hover:bg-pixel-gray/50');
+                if (btn === button) {
+                    if (isCorrect) {
+                        btn.classList.add('bg-google-green', 'text-white', 'border-google-green');
+                    } else {
+                        btn.classList.add('bg-google-red', 'text-white', 'border-google-red');
+                    }
+                }
+                // Zeige die korrekte Antwort, falls falsch
+                if (!isCorrect && q.type === 'mc' && btn.getAttribute('data-answer') === q.correctAnswer) {
+                     btn.classList.add('bg-google-green/50', 'text-black', 'border-google-green');
+                } else if (!isCorrect && q.type === 'tf' && btn.getAttribute('data-answer') === String(q.correctAnswer)) {
+                    btn.classList.add('bg-google-green/50', 'text-black', 'border-google-green');
+                }
+            });
+
+            if (isCorrect) {
+                score++;
+                messageDiv.textContent = "Korrekt! ✅";
+                messageDiv.classList.add('text-google-green');
+            } else {
+                messageDiv.textContent = "Falsch. ❌";
+                messageDiv.classList.add('text-google-red');
+            }
+
+            // Aktiviere den Weiter-Button
+            nextButton.disabled = false;
+            nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            nextButton.classList.add('hover:bg-opacity-90');
+        });
+
+        nextButton.addEventListener('click', () => {
+            if (!isAnswered) return;
+            if (isLastQuestion) {
+                // Bei der letzten Frage direkt zu den Ergebnissen springen und speichern
+                saveResult(); 
+                currentScreen = 'results';
+            } else {
+                currentQuestionIndex++;
+            }
+            render();
+        });
+        lucide.createIcons();
+    }
+
+    /**
+     * Rendert den Ergebnisbildschirm.
+     */
+    function renderResultsScreen() {
+        quizContainer.innerHTML = `
+            <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center">
+                Quiz beendet! <i data-lucide="bar-chart-2" class="w-5 h-5 ml-2 text-google-green"></i>
+            </h2>
+            <div class="bg-google-green text-white p-4 rounded-xl mb-6">
+                Dein Ergebnis: **${score} von ${QUESTIONS.length}** korrekt!
+            </div>
+            
+            <p class="text-sm text-gray-700 mb-4 font-semibold">
+               <i data-lucide="check-check" class="w-4 h-4 inline-block mr-1 text-google-blue"></i> 
+               Deine Daten wurden erfolgreich an die Google Tabelle gesendet.
+            </p>
+
+            <button id="restart-button" class="w-full mt-8 bg-google-red text-white p-3 rounded-lg font-semibold hover:bg-opacity-90 transition duration-150 flex items-center justify-center">
+                <i data-lucide="rotate-ccw" class="w-5 h-5 mr-2"></i> Neues Quiz starten
+            </button>
+        `;
+
+        document.getElementById('restart-button').addEventListener('click', () => {
+            currentScreen = 'start';
+            currentQuestionIndex = 0;
+            score = 0;
+            firstName = '';
+            lastName = '';
+            quizSubmitted = false;
+            render();
+        });
+        
+        lucide.createIcons();
+    }
+
+
+    /**
+     * Haupt-Render-Funktion basierend auf dem aktuellen Zustand.
+     */
+    function render() {
+        quizContainer.innerHTML = '';
+        if (currentScreen === 'start') {
+            renderStartScreen();
+        } else if (currentScreen === 'quiz') {
+            renderQuizQuestion();
+        } else if (currentScreen === 'results') {
+            renderResultsScreen();
+        }
+    }
+
+    // Starte die Anwendung sofort
+    render();
+</script>
+</body>
+</html>
