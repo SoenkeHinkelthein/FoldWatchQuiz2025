@@ -183,7 +183,8 @@
     // --- Globale Kalender-Funktionen, die vom HTML-onclick benötigt werden ---
     
     /**
-     * Helper: Formatiert Datum und Zeit in das ISO-ähnliche UTC-Format (YYYYMMDDTHHMMSSZ) für Kalender.
+     * Helper: Formatiert Datum und Zeit in das ISO-ähnliche Format (YYYYMMDDTHHMMSS) für Kalender.
+     * Das 'Z' (UTC) wird bewusst weggelassen, damit die Zeit als "lokal" für die angegebene Zeitzone (ctz) interpretiert wird.
      */
     function formatDateForCalendar(dateStr, timeStr) {
         // dd.mm.yyyy -> [dd, mm, yyyy]
@@ -191,50 +192,67 @@
         // hh:mm -> hhmm (entfernt " Uhr" und Leerzeichen)
         const timeCleaned = timeStr.replace(' Uhr', '').replace(/\s/g, ''); 
         const time = timeCleaned.replace(':', ''); 
-        return `${year}${month}${day}T${time}00Z`; // Fügt Sekunden und Z (Zulu/UTC) hinzu
+        return `${year}${month}${day}T${time}00`; // Korrektur: 'Z' entfernt
     }
 
     /**
-     * Helper: Generiert den Google Kalender Link.
+     * Helper: Generiert den Google Kalender Link mit korrekter Zeitzone.
      */
     function generateGCalLink(event) {
         const title = encodeURIComponent("Pixel Fold & Watch Training");
         const startDate = formatDateForCalendar(event.date, event.time);
         
-        // Endezeit ist 30 Minuten später
+        // Korrektur: Robuste Berechnung der Endzeit (30 Minuten später)
+        const [day, month, year] = event.date.split('.').map(Number);
         const [hour, minute] = event.time.replace(' Uhr', '').split(':').map(Number);
-        const endDateObj = new Date();
-        endDateObj.setHours(hour);
-        endDateObj.setMinutes(minute + 30);
+        
+        // Monat ist 0-basiert in JavaScript (Januar = 0), daher month - 1
+        const startDateObj = new Date(year, month - 1, day, hour, minute);
+        const endDateObj = new Date(startDateObj.getTime() + 30 * 60000); // 30 Minuten in Millisekunden addieren
+
+        // End-Datum und -Zeit aus dem neuen Datumsobjekt extrahieren
+        const endDay = endDateObj.getDate().toString().padStart(2, '0');
+        const endMonth = (endDateObj.getMonth() + 1).toString().padStart(2, '0');
+        const endYear = endDateObj.getFullYear();
         const endHour = endDateObj.getHours().toString().padStart(2, '0');
         const endMinute = endDateObj.getMinutes().toString().padStart(2, '0');
-        const formattedEndDate = formatDateForCalendar(event.date, `${endHour}:${endMinute}`);
+
+        const formattedEndDate = formatDateForCalendar(`${endDay}.${endMonth}.${endYear}`, `${endHour}:${endMinute}`);
         
         const details = encodeURIComponent("Webinar zu den neuen Features des Google Pixel 10 Pro Fold und der Pixel Watch 4.\nMeeting Link: https://" + event.link);
         const location = encodeURIComponent("Online Meeting: https://" + event.link);
+        const timezone = "Europe/Berlin"; // Korrektur: Zeitzone hinzugefügt
 
-        return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${formattedEndDate}&details=${details}&location=${location}&sf=true&output=xml`;
+        // Korrektur: Der URL wird der Parameter 'ctz' (calendar timezone) hinzugefügt
+        return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${formattedEndDate}&details=${details}&location=${location}&ctz=${timezone}&sf=true&output=xml`;
     }
 
     /**
-     * Helper: Erzeugt und lädt eine .ics Datei herunter.
+     * Helper: Erzeugt und lädt eine .ics Datei herunter (für Outlook, Apple Kalender etc.).
      */
     function downloadIcs(event) {
         const title = "Pixel Fold & Watch Training";
         const startDate = formatDateForCalendar(event.date, event.time);
         
-        // Endezeit ist 30 Minuten später
+        // Korrektur: Robuste Berechnung der Endzeit (identisch zu oben)
+        const [day, month, year] = event.date.split('.').map(Number);
         const [hour, minute] = event.time.replace(' Uhr', '').split(':').map(Number);
-        const endDateObj = new Date();
-        endDateObj.setHours(hour);
-        endDateObj.setMinutes(minute + 30);
+        const startDateObj = new Date(year, month - 1, day, hour, minute);
+        const endDateObj = new Date(startDateObj.getTime() + 30 * 60000); 
+
+        const endDay = endDateObj.getDate().toString().padStart(2, '0');
+        const endMonth = (endDateObj.getMonth() + 1).toString().padStart(2, '0');
+        const endYear = endDateObj.getFullYear();
         const endHour = endDateObj.getHours().toString().padStart(2, '0');
         const endMinute = endDateObj.getMinutes().toString().padStart(2, '0');
-        const formattedEndDate = formatDateForCalendar(event.date, `${endHour}:${endMinute}`);
+        const formattedEndDate = formatDateForCalendar(`${endDay}.${endMonth}.${endYear}`, `${endHour}:${endMinute}`);
 
         const description = "Webinar zu den neuen Features des Google Pixel 10 Pro Fold und der Pixel Watch 4. Meeting Link: https://" + event.link;
         const location = "Online Meeting: https://" + event.link;
 
+        // Korrektur: Zeilenumbrüche in der Beschreibung für .ics-Dateien korrekt formatieren
+        const icsDescription = description.replace(/\n/g, '\\n');
+        
         const icsContent = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
@@ -244,12 +262,12 @@
             'DTSTART:' + startDate,
             'DTEND:' + formattedEndDate,
             'SUMMARY:' + title,
-            'DESCRIPTION:' + description,
+            'DESCRIPTION:' + icsDescription,
             'LOCATION:' + location,
-            'UID:' + crypto.randomUUID(), // Eindeutige ID
+            'UID:' + crypto.randomUUID(),
             'END:VEVENT',
             'END:VCALENDAR'
-        ].join('\n');
+        ].join('\r\n'); // Korrektur: Standardkonforme Zeilenenden für .ics
 
         const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
         const url = URL.createObjectURL(blob);
@@ -637,4 +655,163 @@
                         class="w-full p-3 border border-pixel-gray rounded-lg focus:ring-google-blue focus:border-google-blue transition duration-150">
                 </div>
                 <div class="mb-6">
-                    <label for="last-
+                    <label for="last-name" class="block text-sm font-medium text-gray-700 mb-1">Nachname *</label>
+                    <input type="text" id="last-name" name="last-name" value="${lastName}" placeholder="Dein Nachname" required
+                        class="w-full p-3 border border-pixel-gray rounded-lg focus:ring-google-blue focus:border-google-blue transition duration-150">
+                </div>
+                <button type="submit"
+                    class="w-full bg-google-blue text-white p-4 rounded-lg font-bold text-lg hover:bg-opacity-90 transition duration-150 flex items-center justify-center">
+                    Quiz starten <i data-lucide="arrow-right" class="w-5 h-5 ml-2"></i>
+                </button>
+            </form>
+        `;
+
+        // Event Listener für das Formular hinzufügen
+        const form = document.getElementById('start-form');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            firstName = document.getElementById('first-name').value.trim();
+            lastName = document.getElementById('last-name').value.trim();
+            if (firstName && lastName) {
+                currentScreen = 'quiz';
+                render();
+            } else {
+                alert("Bitte fülle beide Namensfelder aus.");
+            }
+        });
+        if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+    }
+
+
+    /**
+     * Rendert die aktuelle Frage.
+     */
+    function renderQuestionScreen() {
+        const question = QUESTIONS[currentQuestionIndex];
+        let optionsHtml = '';
+
+        if (question.type === 'mc') {
+            optionsHtml = question.options.map(option => `
+                <button class="answer-btn w-full text-left p-4 border border-pixel-gray rounded-lg hover:bg-pixel-gray transition duration-150" data-answer="${option}">
+                    ${option}
+                </button>
+            `).join('');
+        } else if (question.type === 'tf') {
+            optionsHtml = `
+                <button class="answer-btn w-full text-left p-4 border border-pixel-gray rounded-lg hover:bg-pixel-gray transition duration-150" data-answer="true">
+                    Wahr
+                </button>
+                <button class="answer-btn w-full text-left p-4 border border-pixel-gray rounded-lg hover:bg-pixel-gray transition duration-150" data-answer="false">
+                    Falsch
+                </button>
+            `;
+        }
+
+        quizContainer.innerHTML = `
+            <div class="mb-4 text-sm text-gray-500">
+                Frage ${currentQuestionIndex + 1} von ${QUESTIONS.length}
+            </div>
+            <p class="text-xl font-semibold mb-6">${question.emoji} ${question.question}</p>
+            <div class="space-y-3">
+                ${optionsHtml}
+            </div>
+        `;
+
+        // Event Listeners für die Antwort-Buttons
+        document.querySelectorAll('.answer-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const selectedAnswer = e.target.dataset.answer;
+                
+                // Konvertiere 'true'/'false' String zu Boolean für den Vergleich
+                let correctAnswer = question.correctAnswer;
+                let answerToCheck = selectedAnswer;
+                if (typeof correctAnswer === 'boolean') {
+                    answerToCheck = (selectedAnswer === 'true');
+                }
+                
+                if (answerToCheck === correctAnswer) {
+                    score++;
+                }
+
+                if (currentQuestionIndex < QUESTIONS.length - 1) {
+                    currentQuestionIndex++;
+                    render();
+                } else {
+                    currentScreen = 'result';
+                    saveResult(); // Ergebnis speichern
+                    render();
+                }
+            });
+        });
+    }
+
+    /**
+     * Rendert den Ergebnisbildschirm.
+     */
+    function renderResultScreen() {
+        const percentage = Math.round((score / QUESTIONS.length) * 100);
+        let resultMessage = '';
+        let emoji = '';
+
+        if (percentage >= 80) {
+            resultMessage = "Perfekt! Du bist ein echter Pixel-Experte!";
+            emoji = '🏆';
+        } else if (percentage >= 50) {
+            resultMessage = "Stark! Du kennst dich gut aus!";
+            emoji = '👍';
+        } else {
+            resultMessage = "Da ist noch Luft nach oben. Schau dir das Training gut an!";
+            emoji = '💪';
+        }
+        
+        const eventInfo = selectedEvent 
+            ? `<p class="mt-4 text-center p-3 bg-google-blue/10 text-google-blue font-semibold rounded-lg">
+                   Dein Training findet am <strong>${selectedEvent.date}</strong> um <strong>${selectedEvent.time}</strong> statt.
+                   <br>Link: <a href="https://${selectedEvent.link}" target="_blank" class="underline">${selectedEvent.link}</a>
+               </p>`
+            : '';
+
+        quizContainer.innerHTML = `
+            <h2 class="text-2xl font-bold mb-4 text-center">${emoji} Quiz beendet, ${firstName}!</h2>
+            <p class="text-center text-lg mb-6">Du hast <strong>${score} von ${QUESTIONS.length}</strong> Fragen richtig beantwortet.</p>
+            <div class="text-center p-6 bg-pixel-gray rounded-lg mb-6">
+                <div class="text-5xl font-extrabold text-google-blue">${percentage}%</div>
+                <p class="mt-2 text-gray-700">${resultMessage}</p>
+            </div>
+            ${eventInfo}
+            <p class="text-xs text-center text-gray-500 mt-6">
+                Dein Ergebnis wurde gespeichert. Du kannst diese Seite nun schließen.
+            </p>
+        `;
+    }
+
+    // --- Haupt-Render-Funktion ---
+    function render() {
+        quizContainer.innerHTML = ''; // Leert den Container vor dem Neuzeichnen
+        switch (currentScreen) {
+            case 'calendar':
+                renderCalendarSelectionScreen();
+                break;
+            case 'start':
+                renderNameInputScreen();
+                break;
+            case 'quiz':
+                renderQuestionScreen();
+                break;
+            case 'result':
+                renderResultScreen();
+                break;
+            default:
+                quizContainer.innerHTML = '<p>Ein Fehler ist aufgetreten.</p>';
+        }
+    }
+
+    // Initiales Rendern beim Laden der Seite
+    document.addEventListener('DOMContentLoaded', () => {
+        render();
+    });
+
+</script>
+
+</body>
+</html>
