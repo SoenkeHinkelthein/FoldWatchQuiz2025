@@ -335,13 +335,13 @@
     const GOOGLE_SHEETS_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsg_ySSpTeWIjxQnjnbrvx-dKTe1OmvIkgZDqo5gN3XNiDUSiGYNwzT2pkUb6GCkqeNA/exec"; 
 
     // --- ZUSTÄNDE ---
-    let currentScreen = 'calendar'; // NEU: Startet mit der Kalenderansicht
+    let currentScreen = 'calendar'; // Startet mit der Kalenderansicht
     let currentQuestionIndex = 0;
     let score = 0;
     let firstName = '';
     let lastName = '';
     let quizSubmitted = false;
-    let selectedEvent = null; // NEU: Hält das ausgewählte Event
+    let selectedEvent = null; // Hält das ausgewählte Event
     
     const userId = crypto.randomUUID(); 
     
@@ -375,7 +375,7 @@
     });
     // --- ENDE KALENDER DATEN ---
 
-    // Die QUESTIONS sind unverändert und bleiben hier. (Linien ~383 - ~550)
+    // Die QUESTIONS sind unverändert.
     const QUESTIONS = [
         {
             id: 1,
@@ -589,7 +589,7 @@
     // --- RENDERING FUNKTIONEN ---
 
     /**
-     * NEU: Rendert den ersten Bildschirm zur Terminauswahl.
+     * Rendert den ersten Bildschirm zur Terminauswahl.
      */
     function renderCalendarSelectionScreen() {
         let calendarHtml = CALENDAR_EVENTS.map(event => {
@@ -684,7 +684,8 @@
 
 
     /**
-     * Rendert die aktuelle Frage.
+     * Rendert die aktuelle Frage und implementiert visuelles Feedback.
+     * --- DIESER BLOCK WURDE ÜBERARBEITET ---
      */
     function renderQuestionScreen() {
         const question = QUESTIONS[currentQuestionIndex];
@@ -692,17 +693,17 @@
 
         if (question.type === 'mc') {
             optionsHtml = question.options.map(option => `
-                <button class="answer-btn w-full text-left p-4 border border-pixel-gray rounded-lg hover:bg-pixel-gray transition duration-150" data-answer="${option}">
-                    ${option}
+                <button class="answer-btn w-full text-left p-4 border border-pixel-gray rounded-lg hover:bg-pixel-gray transition duration-150 flex items-center justify-between" data-answer="${option}">
+                    <span>${option}</span>
                 </button>
             `).join('');
         } else if (question.type === 'tf') {
             optionsHtml = `
-                <button class="answer-btn w-full text-left p-4 border border-pixel-gray rounded-lg hover:bg-pixel-gray transition duration-150" data-answer="true">
-                    Wahr
+                <button class="answer-btn w-full text-left p-4 border border-pixel-gray rounded-lg hover:bg-pixel-gray transition duration-150 flex items-center justify-between" data-answer="true">
+                    <span>Wahr</span>
                 </button>
-                <button class="answer-btn w-full text-left p-4 border border-pixel-gray rounded-lg hover:bg-pixel-gray transition duration-150" data-answer="false">
-                    Falsch
+                <button class="answer-btn w-full text-left p-4 border border-pixel-gray rounded-lg hover:bg-pixel-gray transition duration-150 flex items-center justify-between" data-answer="false">
+                    <span>Falsch</span>
                 </button>
             `;
         }
@@ -720,30 +721,71 @@
         // Event Listeners für die Antwort-Buttons
         document.querySelectorAll('.answer-btn').forEach(button => {
             button.addEventListener('click', (e) => {
-                const selectedAnswer = e.target.dataset.answer;
-                
-                // Konvertiere 'true'/'false' String zu Boolean für den Vergleich
-                let correctAnswer = question.correctAnswer;
-                let answerToCheck = selectedAnswer;
+                const clickedButton = e.currentTarget;
+                const allButtons = document.querySelectorAll('.answer-btn');
+
+                // 1. Alle Buttons deaktivieren, um doppelte Klicks zu verhindern
+                allButtons.forEach(btn => btn.disabled = true);
+
+                // 2. Die Antwort auswerten
+                const selectedAnswer = clickedButton.dataset.answer;
+                const correctAnswer = question.correctAnswer;
+                let isCorrect = false;
+
+                // Korrekter Vergleich für Boolean- und String-Antworten
                 if (typeof correctAnswer === 'boolean') {
-                    answerToCheck = (selectedAnswer === 'true');
+                    isCorrect = (selectedAnswer === 'true') === correctAnswer;
+                } else {
+                    isCorrect = selectedAnswer === correctAnswer;
                 }
                 
-                if (answerToCheck === correctAnswer) {
+                if (isCorrect) {
                     score++;
                 }
 
-                if (currentQuestionIndex < QUESTIONS.length - 1) {
-                    currentQuestionIndex++;
-                    render();
-                } else {
-                    currentScreen = 'result';
-                    saveResult(); // Ergebnis speichern
-                    render();
-                }
+                // 3. Visuelles Feedback geben
+                allButtons.forEach(btn => {
+                    let btnAnswer = btn.dataset.answer;
+                    let isCorrectAnswerButton = false;
+                    
+                    if (typeof correctAnswer === 'boolean') {
+                        isCorrectAnswerButton = (btnAnswer === 'true') === correctAnswer;
+                    } else {
+                        isCorrectAnswerButton = btnAnswer === correctAnswer;
+                    }
+
+                    // Den korrekten Button immer grün markieren
+                    if (isCorrectAnswerButton) {
+                        btn.classList.remove('border-pixel-gray', 'hover:bg-pixel-gray');
+                        btn.classList.add('bg-google-green', 'text-white', 'border-google-green');
+                        btn.innerHTML += '<i data-lucide="check-circle" class="w-5 h-5"></i>';
+                    } 
+                    // Wenn der geklickte Button falsch war, diesen rot markieren
+                    else if (btn === clickedButton) {
+                        btn.classList.remove('border-pixel-gray', 'hover:bg-pixel-gray');
+                        btn.classList.add('bg-google-red', 'text-white', 'border-google-red');
+                        btn.innerHTML += '<i data-lucide="x-circle" class="w-5 h-5"></i>';
+                    }
+                });
+
+                // Lucide-Icons neu rendern
+                if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+
+                // 4. Warten und dann zur nächsten Frage oder zum Ergebnis gehen
+                setTimeout(() => {
+                    if (currentQuestionIndex < QUESTIONS.length - 1) {
+                        currentQuestionIndex++;
+                        render();
+                    } else {
+                        currentScreen = 'result';
+                        saveResult();
+                        render();
+                    }
+                }, 1500); // 1,5 Sekunden Verzögerung
             });
         });
     }
+
 
     /**
      * Rendert den Ergebnisbildschirm.
